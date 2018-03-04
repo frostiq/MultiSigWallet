@@ -1,10 +1,14 @@
-pragma solidity 0.4.15;
+pragma solidity 0.4.19;
+
+import "zeppelin-solidity/contracts/math/SafeMath.sol";
 import "./MultiSigWallet.sol";
 
 
 /// @title Multisignature wallet with daily limit - Allows an owner to withdraw a daily limit without multisig.
 /// @author Stefan George - <stefan.george@consensys.net>
 contract MultiSigWalletWithDailyLimit is MultiSigWallet {
+
+    using SafeMath for uint;
 
     /*
      *  Events
@@ -55,14 +59,14 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
         if (_confirmed || txn.data.length == 0 && isUnderLimit(txn.value)) {
             txn.executed = true;
             if (!_confirmed)
-                spentToday += txn.value;
+                spentToday = spentToday.add(txn.value);
             if (txn.destination.call.value(txn.value)(txn.data))
                 Execution(transactionId);
             else {
                 ExecutionFailure(transactionId);
                 txn.executed = false;
                 if (!_confirmed)
-                    spentToday -= txn.value;
+                    spentToday = spentToday.sub(txn.value);
             }
         }
     }
@@ -77,11 +81,11 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
         internal
         returns (bool)
     {
-        if (now > lastDay + 24 hours) {
+        if (now > lastDay.add(24 hours)) {
             lastDay = now;
             spentToday = 0;
         }
-        if (spentToday + amount > dailyLimit || spentToday + amount < spentToday)
+        if (spentToday.add(amount) > dailyLimit || spentToday.add(amount) < spentToday)
             return false;
         return true;
     }
@@ -96,10 +100,10 @@ contract MultiSigWalletWithDailyLimit is MultiSigWallet {
         constant
         returns (uint)
     {
-        if (now > lastDay + 24 hours)
+        if (now > lastDay.add(24 hours))
             return dailyLimit;
         if (dailyLimit < spentToday)
             return 0;
-        return dailyLimit - spentToday;
+        return dailyLimit.sub(spentToday);
     }
 }
